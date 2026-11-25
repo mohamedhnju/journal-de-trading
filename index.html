@@ -93,6 +93,7 @@ dialog::backdrop{background:rgba(0,0,0,.75)}
 .auth{position:fixed;inset:0;z-index:15;background:var(--bg);display:grid;place-items:center;padding:20px;overflow:auto}
 .authcard{width:min(400px,100%);display:grid;gap:12px;background:var(--panel);border-radius:18px;padding:26px;box-shadow:0 0 0 1px hsl(var(--h) 100% 60% / .35),0 0 40px -12px hsl(var(--h) 100% 55% / .45)}
 .authcard label{display:grid;gap:4px;font-size:13px;color:var(--mute)}
+.pw{position:relative;display:block}.pw input{width:100%;padding-right:70px}.eye{position:absolute;right:4px;top:4px;bottom:4px;min-width:60px;border:0;border-radius:8px;background:var(--line);color:var(--ink);cursor:pointer;font-size:14px}
 .aerr{color:var(--loss);font-size:14px;margin:0;min-height:1.2em}
 .linkbtn{background:none;border:0;color:var(--mute);text-decoration:underline;cursor:pointer;min-height:40px}
 .foot{display:flex;justify-content:flex-end;gap:10px;padding:0 22px 22px}
@@ -135,8 +136,8 @@ table{font-size:13px}.stack thead{display:none}.stack tr{display:grid;padding-bl
  <form class="authcard" id="authForm">
   <h2>Connexion</h2>
   <p class="status" style="margin:0 0 14px">Connecte-toi pour retrouver tes trades sur tous tes appareils.</p>
-  <label>E-mail<input type="email" id="aEmail" autocomplete="email" required></label>
-  <label>Mot de passe<input type="password" id="aPass" autocomplete="current-password" minlength="6" required></label>
+  <label>E-mail<input type="email" id="aEmail" autocomplete="email" autocapitalize="off" autocorrect="off" spellcheck="false" required></label>
+  <label>Mot de passe<span class="pw"><input type="password" id="aPass" autocomplete="current-password" autocapitalize="off" autocorrect="off" spellcheck="false" minlength="6" required><button type="button" class="eye" id="aEye" aria-label="Afficher le mot de passe">Voir</button></span></label>
   <p class="aerr" id="aErr" role="alert"></p>
   <button class="btn" type="submit" id="aLogin">Se connecter</button>
   <button class="btn ghost" type="button" id="aSignup">Créer mon compte</button>
@@ -501,8 +502,9 @@ const MSG={'auth/invalid-email':'Adresse e-mail invalide.','auth/missing-passwor
  'auth/email-already-in-use':'Un compte existe déjà avec cet e-mail : connecte-toi.','auth/invalid-credential':'E-mail ou mot de passe incorrect.','auth/wrong-password':'E-mail ou mot de passe incorrect.',
  'auth/user-not-found':'Aucun compte avec cet e-mail.','auth/too-many-requests':'Trop d\'essais, réessaie dans quelques minutes.','auth/network-request-failed':'Pas de connexion internet.',
  'auth/operation-not-allowed':'La connexion par e-mail n\'est pas activée dans Firebase.','auth/unauthorized-domain':'Ce site n\'est pas autorisé dans Firebase (domaines autorisés).'};
-const err=e=>{$('#aErr').textContent=MSG[e?.code]||('Erreur : '+(e?.code||e?.message||'inconnue'))};
-const creds=()=>[$('#aEmail').value.trim(),$('#aPass').value];
+const err=e=>{$('#aErr').textContent=(MSG[e?.code]||'Erreur')+' ('+(e?.code||e?.message||'inconnue')+')'};
+const creds=()=>[$('#aEmail').value.trim().toLowerCase(),$('#aPass').value];
+$('#aEye').onclick=()=>{const i=$('#aPass'),s=i.type==='password';i.type=s?'text':'password';$('#aEye').textContent=s?'Cacher':'Voir'};
 const busy=on=>{['#aLogin','#aSignup'].forEach(s=>$(s).disabled=on)};
 $('#authForm').addEventListener('submit',async e=>{e.preventDefault();$('#aErr').textContent='';busy(true);
   try{await signInWithEmailAndPassword(auth,...creds())}catch(x){err(x)}busy(false)});
