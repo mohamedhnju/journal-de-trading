@@ -90,6 +90,11 @@ dialog::backdrop{background:rgba(0,0,0,.75)}
 .lb{position:fixed;inset:0;z-index:30;background:rgba(0,0,0,.92);display:grid;place-items:center;padding:20px;cursor:zoom-out}.lb img{max-width:100%;max-height:100%;border-radius:10px}
 .dhead{position:sticky;top:0;z-index:2;display:flex;justify-content:space-between;align-items:center;gap:12px;background:var(--panel);margin:-22px -22px 0;padding:16px 22px;border-bottom:1px solid var(--line)}
 .xbtn{flex:none;width:44px;height:44px;border-radius:50%;border:1px solid var(--line);background:transparent;color:var(--ink);font-size:18px;cursor:pointer}.xbtn:hover{border-color:var(--acc);color:var(--acc)}
+.auth{position:fixed;inset:0;z-index:15;background:var(--bg);display:grid;place-items:center;padding:20px;overflow:auto}
+.authcard{width:min(400px,100%);display:grid;gap:12px;background:var(--panel);border-radius:18px;padding:26px;box-shadow:0 0 0 1px hsl(var(--h) 100% 60% / .35),0 0 40px -12px hsl(var(--h) 100% 55% / .45)}
+.authcard label{display:grid;gap:4px;font-size:13px;color:var(--mute)}
+.aerr{color:var(--loss);font-size:14px;margin:0;min-height:1.2em}
+.linkbtn{background:none;border:0;color:var(--mute);text-decoration:underline;cursor:pointer;min-height:40px}
 .foot{display:flex;justify-content:flex-end;gap:10px;padding:0 22px 22px}
 .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;display:none;gap:14px;align-items:center;font-size:14px;z-index:9}
 .toast button{background:none;border:0;color:#d6002f;font-weight:600;cursor:pointer;min-height:36px}
@@ -126,6 +131,18 @@ table{font-size:13px}.stack thead{display:none}.stack tr{display:grid;padding-bl
   <button class="btn" id="enter">Ouvrir mon journal</button>
  </div>
 </section>
+<section class="auth" id="auth" hidden aria-label="Connexion">
+ <form class="authcard" id="authForm">
+  <h2>Connexion</h2>
+  <p class="status" style="margin:0 0 14px">Connecte-toi pour retrouver tes trades sur tous tes appareils.</p>
+  <label>E-mail<input type="email" id="aEmail" autocomplete="email" required></label>
+  <label>Mot de passe<input type="password" id="aPass" autocomplete="current-password" minlength="6" required></label>
+  <p class="aerr" id="aErr" role="alert"></p>
+  <button class="btn" type="submit" id="aLogin">Se connecter</button>
+  <button class="btn ghost" type="button" id="aSignup">Créer mon compte</button>
+  <button class="linkbtn" type="button" id="aReset">Mot de passe oublié ?</button>
+ </form>
+</section>
 <header class="band" style="padding-bottom:0">
  <div class="wrap">
   <div class="top">
@@ -135,7 +152,7 @@ table{font-size:13px}.stack thead{display:none}.stack tr{display:grid;padding-bl
     <a class="chip" href="#reel" data-m="Réel">Réel</a>
     <a class="chip" href="#backtest" data-m="Backtest">Backtest</a>
    </nav>
-   <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn ghost" id="homeBtn">← Accueil</button><button class="btn" id="addBtn">+ Nouveau trade</button></div>
+   <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn ghost" id="homeBtn">← Accueil</button><button class="btn ghost" id="logoutBtn" hidden>Déconnexion</button><button class="btn" id="addBtn">+ Nouveau trade</button></div>
   </div>
   <section class="hero">
    <div class="fig" id="fig"><svg id="chart" aria-label="Courbe des R cumulés"></svg><div class="empty" id="emptyChart">Aucun trade pour l'instant.<br>Ajoute ton premier trade pour voir ta courbe en R.</div></div>
@@ -402,11 +419,13 @@ $('#csvBtn').onclick=async()=>{
   ['Ne cherche pas à te refaire : ','le trade de revanche est le plus cher de tous','.'],
   ['La discipline d\'aujourd\'hui, ','c\'est le compte financé de demain','.'],
   ['Avec un R:R de 2, ','tu peux perdre plus d\'un trade sur deux',' et rester gagnant.']];
- let qi=0;const qt=$('#qText');
+ const pick=()=>{let n;do{n=Math.floor(Math.random()*QUOTES.length)}while(n===qi&&QUOTES.length>1);return n};
+ let qi=-1;const qt=$('#qText');
  const showQuote=i=>{const [a,b,c]=QUOTES[i];qt.textContent='';qt.append(a);const el=document.createElement('b');el.textContent=b;qt.append(el,c)};
  setInterval(()=>{if(intro.classList.contains('out'))return;qt.classList.add('hide');
-  setTimeout(()=>{qi=(qi+1)%QUOTES.length;showQuote(qi);qt.classList.remove('hide')},700)},10000);
- $('#homeBtn').onclick=()=>{play();intro.classList.remove('out');window.scrollTo(0,0);$('#enter').focus()};
+  setTimeout(()=>{qi=pick();showQuote(qi);qt.classList.remove('hide')},700)},10000);
+ qi=pick();showQuote(qi);
+ $('#homeBtn').onclick=()=>{qi=pick();showQuote(qi);play();intro.classList.remove('out');window.scrollTo(0,0);$('#enter').focus()};
  $('#enter').focus()}
 
 /* screenshots */
@@ -434,26 +453,69 @@ $('#lb').onclick=()=>{$('#lb').hidden=true};
 document.addEventListener('keydown',e=>{if(e.key==='Escape')$('#lb').hidden=true});
 
 
-/* storage */
+/* storage: local first, then Firebase once signed in */
 lsLoad();route();setStatus('Enregistré sur cet appareil');
-(async()=>{
-  try{
-    if(typeof claude==='undefined'){setStatus('Enregistré sur cet appareil');return}
-    const db=await claude.use('db'),user=await claude.use('user');
-    const uid=user?await user.id():null;
-    if(!db||!uid){setStatus('Enregistré sur cet appareil uniquement');return}
-    col=db.collection('data/users/'+uid);
-    const local=trades.slice();let first=true;
+let unsub=null;
+window.journalStore={
+  connect(c,uid,email){
+    if(unsub)unsub();col=c;setStatus('Connexion à ta base…');
+    const local=trades.slice(),key='journal-migre-'+uid;let first=true,migrated=false;
+    try{migrated=localStorage.getItem(key)==='1'}catch(e){}
     const timer=setTimeout(()=>setStatus('Synchronisation impossible pour l\'instant…'),10000);
-    col.onSnapshot(snap=>{
+    unsub=col.onSnapshot(snap=>{
       const t=[];snap.docs.forEach(d=>{const x=d.data();if(!x)return;if(d.id==='settings')settings={...settings,...x};else t.push({...x,id:d.id})});
-      if(!snap.metadata.fromCache){clearTimeout(timer);setStatus('Synchronisé sur ton compte');
-        if(first&&!t.length&&local.length){first=false;local.forEach(x=>col.doc(x.id).set(x).catch(()=>{}));return}first=false}
+      if(!snap.metadata.fromCache){clearTimeout(timer);setStatus('Synchronisé · '+email);
+        if(first){first=false;
+          if(!migrated&&local.length){const have=new Set(t.map(x=>x.id)),todo=local.filter(x=>!have.has(x.id));
+            todo.forEach(x=>col.doc(x.id).set(x).catch(()=>{}));
+            try{localStorage.setItem(key,'1')}catch(e){}
+            if(todo.length)setStatus(`Synchronisé · ${todo.length} trade(s) de cet appareil ajouté(s)`)}}}
       trades=t;render()
-    },err=>{clearTimeout(timer);col=null;setStatus('Synchronisation coupée : enregistré sur cet appareil')});
-  }catch(e){setStatus('Enregistré sur cet appareil uniquement')}
-})();
+    },err=>{clearTimeout(timer);setStatus('Synchronisation coupée : recharge la page')});
+  },
+  disconnect(){if(unsub)unsub();unsub=null;col=null;trades=[];lsLoad();render();setStatus('Non connecté')},
+  status:setStatus
+};
 }
+</script>
+<script type="module">
+import {initializeApp} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,createUserWithEmailAndPassword,sendPasswordResetEmail,signOut,setPersistence,browserLocalPersistence} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+import {getFirestore,collection,doc,setDoc,deleteDoc,onSnapshot} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+const firebaseConfig={
+  apiKey:"AIzaSyCqZHgrJcvXqyikYeakcPRWhpzE-IYqrqo",
+  authDomain:"journal-de-trading-db15e.firebaseapp.com",
+  projectId:"journal-de-trading-db15e",
+  storageBucket:"journal-de-trading-db15e.firebasestorage.app",
+  messagingSenderId:"1030702338754",
+  appId:"1:1030702338754:web:bae25439328a6ad00e615b"
+};
+const $=s=>document.querySelector(s);
+const app=initializeApp(firebaseConfig),auth=getAuth(app),fs=getFirestore(app);
+setPersistence(auth,browserLocalPersistence).catch(()=>{});
+const clean=o=>JSON.parse(JSON.stringify(o));
+const wrap=uid=>{const items=collection(fs,'users',uid,'items');return{
+  doc:id=>({set:d=>setDoc(doc(items,id),clean(d)),delete:()=>deleteDoc(doc(items,id))}),
+  onSnapshot:(next,err)=>onSnapshot(items,s=>next({docs:s.docs.map(d=>({id:d.id,data:()=>d.data()})),metadata:{fromCache:s.metadata.fromCache}}),err)}};
+const MSG={'auth/invalid-email':'Adresse e-mail invalide.','auth/missing-password':'Entre ton mot de passe.','auth/weak-password':'Mot de passe trop court (6 caractères minimum).',
+ 'auth/email-already-in-use':'Un compte existe déjà avec cet e-mail : connecte-toi.','auth/invalid-credential':'E-mail ou mot de passe incorrect.','auth/wrong-password':'E-mail ou mot de passe incorrect.',
+ 'auth/user-not-found':'Aucun compte avec cet e-mail.','auth/too-many-requests':'Trop d\'essais, réessaie dans quelques minutes.','auth/network-request-failed':'Pas de connexion internet.',
+ 'auth/operation-not-allowed':'La connexion par e-mail n\'est pas activée dans Firebase.','auth/unauthorized-domain':'Ce site n\'est pas autorisé dans Firebase (domaines autorisés).'};
+const err=e=>{$('#aErr').textContent=MSG[e?.code]||('Erreur : '+(e?.code||e?.message||'inconnue'))};
+const creds=()=>[$('#aEmail').value.trim(),$('#aPass').value];
+const busy=on=>{['#aLogin','#aSignup'].forEach(s=>$(s).disabled=on)};
+$('#authForm').addEventListener('submit',async e=>{e.preventDefault();$('#aErr').textContent='';busy(true);
+  try{await signInWithEmailAndPassword(auth,...creds())}catch(x){err(x)}busy(false)});
+$('#aSignup').onclick=async()=>{$('#aErr').textContent='';if(!$('#authForm').reportValidity())return;busy(true);
+  try{await createUserWithEmailAndPassword(auth,...creds())}catch(x){err(x)}busy(false)};
+$('#aReset').onclick=async()=>{const m=$('#aEmail').value.trim();if(!m){$('#aErr').textContent='Entre ton e-mail au-dessus, puis reclique.';return}
+  try{await sendPasswordResetEmail(auth,m);$('#aErr').textContent='E-mail de réinitialisation envoyé (regarde aussi les spams).'}catch(x){err(x)}};
+$('#logoutBtn').onclick=()=>signOut(auth);
+onAuthStateChanged(auth,u=>{
+  $('#auth').hidden=!!u;$('#logoutBtn').hidden=!u;
+  if(u){$('#aPass').value='';window.journalStore.connect(wrap(u.uid),u.uid,u.email||'')}
+  else window.journalStore.disconnect();
+});
 </script>
 </body>
 </html>
