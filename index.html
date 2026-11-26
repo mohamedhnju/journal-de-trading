@@ -95,6 +95,14 @@ dialog::backdrop{background:rgba(0,0,0,.75)}
 .authcard label{display:grid;gap:4px;font-size:13px;color:var(--mute)}
 .pw{position:relative;display:block}.pw input{width:100%;padding-right:70px}.eye{position:absolute;right:4px;top:4px;bottom:4px;min-width:60px;border:0;border-radius:8px;background:var(--line);color:var(--ink);cursor:pointer;font-size:14px}
 #logoutBtn{background:#e5383b;border:0;color:#fff}#logoutBtn:hover{background:#c62a2d}
+.psyday{border-radius:18px;padding:clamp(24px,4vw,44px);background:var(--panel);text-align:center;box-shadow:0 0 0 1px hsl(var(--h) 100% 60% / .35),0 0 50px -14px hsl(var(--h) 100% 55% / .5);margin-top:22px}
+.psybig{font-family:"Inter Tight",sans-serif;font-weight:300;font-size:clamp(24px,3.6vw,38px);line-height:1.25;max-width:30ch;margin:14px auto 22px;text-wrap:balance;transition:opacity .4s}
+.psybig b,.psycard b{font-weight:600;color:var(--ink)}
+.psyfilters{margin:28px 0 8px}
+.psyfilters .chip[aria-pressed=true]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.psygrp h2{margin:26px 0 12px}
+.psygrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,280px),1fr));gap:14px}
+.psycard{background:var(--panel);border-radius:14px;padding:18px 18px 18px 20px;color:var(--mute);font-size:17px;line-height:1.5;border-left:3px solid hsl(calc(var(--h) + var(--o,0)) 100% 60%)}
 .aerr{color:var(--loss);font-size:14px;margin:0;min-height:1.2em}
 .linkbtn{background:none;border:0;color:var(--mute);text-decoration:underline;cursor:pointer;min-height:40px}
 .foot{display:flex;justify-content:flex-end;gap:10px;padding:0 22px 22px}
@@ -153,17 +161,18 @@ table{font-size:13px}.stack thead{display:none}.stack tr{display:grid;padding-bl
     <a class="chip" href="#challenge" data-m="Challenge">Challenge</a>
     <a class="chip" href="#reel" data-m="Réel">Réel</a>
     <a class="chip" href="#backtest" data-m="Backtest">Backtest</a>
+    <a class="chip" href="#psychologie" data-m="Psychologie">Psychologie</a>
    </nav>
    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn ghost" id="homeBtn">← Accueil</button><button class="btn ghost" id="logoutBtn" hidden>Déconnexion</button><button class="btn" id="addBtn">+ Nouveau trade</button></div>
   </div>
-  <section class="hero">
+  <section class="hero" id="heroSec">
    <div class="fig" id="fig"><svg id="chart" aria-label="Courbe des R cumulés"></svg><div class="empty" id="emptyChart">Aucun trade pour l'instant.<br>Ajoute ton premier trade pour voir ta courbe en R.</div></div>
    <div class="kpis" id="kpis"></div>
   </section>
  </div>
 </header>
 
-<section class="band">
+<section class="band" id="statsSec">
  <div class="wrap grid2">
   <div class="card" id="chCard">
    <h2>Suivi du challenge</h2>
@@ -182,7 +191,16 @@ table{font-size:13px}.stack thead{display:none}.stack tr{display:grid;padding-bl
  </div>
 </section>
 
-<section class="band" style="padding-top:0">
+<section class="band" id="psySec" hidden>
+ <div class="wrap">
+  <div class="psyday">
+   <div class="status">Phrase du moment</div>
+   <p class="psybig" id="psyBig" aria-live="polite"></p>
+   <button class="btn" id="psyNext">Une autre phrase</button>
+  </div>
+ </div>
+</section>
+<section class="band" style="padding-top:0" id="tradesSec">
  <div class="wrap">
   <div class="toolbar">
    <h2 style="margin:0">Trades</h2>
@@ -386,9 +404,10 @@ $('#rows').addEventListener('click',e=>{const b=e.target.closest('button');if(!b
     $('#toastMsg').textContent=`Trade ${t.pair} supprimé`;$('#toast').style.display='flex';clearTimeout(toastT);toastT=setTimeout(()=>{$('#toast').style.display='none'},6000)}});
 $('#undo').onclick=()=>{if(lastDeleted)saveTrade(lastDeleted);lastDeleted=null;$('#toast').style.display='none'};
 
-const PAGES={challenge:['Challenge','Challenge prop firm'],reel:['Réel','Compte réel'],backtest:['Backtest','Backtest']};
+const PAGES={challenge:['Challenge','Challenge prop firm'],reel:['Réel','Compte réel'],backtest:['Backtest','Backtest'],psychologie:['Psychologie','Psychologie']};
 function route(){const k=PAGES[location.hash.slice(1)]?location.hash.slice(1):'challenge';mode=PAGES[k][0];
   $('#chCard').hidden=mode!=='Challenge';
+  const psy=mode==='Psychologie';['#heroSec','#statsSec','#tradesSec','#addBtn'].forEach(s=>$(s).hidden=psy);$('#psySec').hidden=!psy;if(psy)renderPsy();
   document.querySelectorAll('#modes a').forEach(a=>a.toggleAttribute('aria-current',a.dataset.m===mode));
   $('#fPair').value='';$('#fRes').value='';render()}
 window.addEventListener('hashchange',route);
@@ -453,6 +472,61 @@ $('#shotBox').addEventListener('drop',e=>{e.preventDefault();takeFile(e.dataTran
 $('#rows').addEventListener('click',e=>{const b=e.target.closest('[data-z]');if(!b)return;const t=trades.find(x=>x.id===b.dataset.z);if(!t)return;$('#lbImg').src=shotSrc(t);$('#lb').hidden=false});
 $('#lb').onclick=()=>{$('#lb').hidden=true};
 document.addEventListener('keydown',e=>{if(e.key==='Escape')$('#lb').hidden=true});
+
+
+/* psychologie */
+const PSY=[
+ ['Patience',[
+  ['La patience est la clé de la réussite : ','le marché paie ceux qui savent attendre leur setup.'],
+  ['Pas de setup, pas de trade. ','Ne rien faire est aussi une position.'],
+  ['Le meilleur trade de la journée ','est parfois celui que tu ne prends pas.'],
+  ['Tu n\'es pas payé pour être devant ton écran, ','tu es payé pour attendre le bon moment.'],
+  ['Le marché sera encore là demain. ','Ton capital doit l\'être aussi.'],
+  ['Attendre que le prix vienne dans ta zone, ','c\'est déjà faire ton travail.'],
+  ['Un setup forcé ','n\'est jamais un vrai setup.'],
+  ['Si tu dois te convaincre de prendre un trade, ','c\'est qu\'il n\'est pas pour toi.']]],
+ ['Stop loss et pertes',[
+  ['Les SL sont normaux : ','ils font partie du jeu, pas de ton échec.'],
+  ['Un stop loss touché, c\'est le prix d\'entrée pour jouer. ','Respecte-le et passe au suivant.'],
+  ['Une perte qui respecte ton plan ','vaut mieux qu\'un gain qui le trahit.'],
+  ['Un SL n\'est pas une erreur, ','c\'est une dépense prévue.'],
+  ['Déplacer ton stop pour ne pas perdre, ','c\'est accepter de perdre plus.'],
+  ['Les pertes ne te définissent pas. ','Ta réaction après, si.'],
+  ['Même les meilleurs traders enchaînent les pertes. ','La différence, c\'est qu\'ils continuent d\'appliquer leur plan.'],
+  ['Avec un R:R de 2, ','tu peux perdre plus d\'un trade sur deux et rester gagnant.']]],
+ ['Discipline',[
+  ['La discipline d\'aujourd\'hui, ','c\'est le compte financé de demain.'],
+  ['Ton plan ne marche que ','si tu le suis aussi les mauvais jours.'],
+  ['Tu ne gagnes pas sur un trade, ','tu gagnes sur une série de trades bien exécutés.'],
+  ['Le risque est la seule chose que tu contrôles. ','Contrôle-le à chaque trade.'],
+  ['Une règle que tu casses une fois ','devient une règle que tu casses toujours.'],
+  ['Le journal ne ment pas : ','écris ce que tu as vraiment fait, pas ce que tu aurais voulu faire.'],
+  ['Juge un trade sur son exécution, ','pas sur son résultat.'],
+  ['La régularité bat le talent ','quand le talent n\'est pas régulier.']]],
+ ['Émotions',[
+  ['Ne cherche pas à te refaire : ','le trade de revanche est le plus cher de tous.'],
+  ['Le FOMO te fait entrer en retard ','et sortir au pire moment.'],
+  ['Si tu ressens le besoin de trader, ','c\'est le moment de fermer les graphiques.'],
+  ['Après deux pertes d\'affilée, ','une pause vaut plus qu\'un nouveau trade.'],
+  ['Un trade raté ne se rattrape pas, ','il se digère.'],
+  ['L\'euphorie après un gros gain ','est aussi dangereuse que la colère après une perte.'],
+  ['Trade le graphique, ','pas ton humeur.'],
+  ['Si tu regardes ton P&L toutes les minutes, ','ta position est trop grosse.']]],
+ ['Long terme',[
+  ['Le but n\'est pas d\'avoir raison, ','c\'est d\'être rentable sur la durée.'],
+  ['Un challenge se valide avec de la gestion, ','pas avec un coup de chance.'],
+  ['Petits gains réguliers, ','gros résultats à la fin de l\'année.'],
+  ['Protège ton capital d\'abord. ','Les gains viendront ensuite.'],
+  ['Trente trades ne prouvent rien. ','Trois cents commencent à parler.'],
+  ['Chaque trade noté dans ce journal ','te rapproche de ta meilleure version de trader.'],
+  ['Le marché récompense la constance, ','pas l\'intensité.'],
+  ['Ce n\'est pas un sprint. ','C\'est un métier qui s\'apprend.']]]
+];
+const PSYALL=PSY.flatMap(([c,l])=>l);let psyI=-1;
+function psyNode(el,[a,b]){el.textContent='';el.append(a);const s=document.createElement('b');s.textContent=b;el.append(s)}
+function psyNext(){let n;do{n=Math.floor(Math.random()*PSYALL.length)}while(n===psyI&&PSYALL.length>1);psyI=n;const el=$('#psyBig');el.style.opacity=0;setTimeout(()=>{psyNode(el,PSYALL[n]);el.style.opacity=1},psyI<0?0:200)}
+function renderPsy(){if(psyI<0)psyNext()}
+$('#psyNext').onclick=psyNext;
 
 
 /* storage: local first, then Firebase once signed in */
