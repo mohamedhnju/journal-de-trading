@@ -25,7 +25,12 @@ body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 Inter,system-
 h1,h2{font-family:"Inter Tight",Inter,sans-serif;margin:0;text-wrap:balance;line-height:1.05}
 h1{font-weight:600;font-size:clamp(26px,4vw,36px)}
 h2{font-weight:600;font-size:22px;margin-bottom:14px}
-.top{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center;justify-content:space-between}
+.top{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"ttl nav" "btns add";gap:14px 20px;align-items:center}
+.top .ttl{grid-area:ttl}.top #modes{grid-area:nav;justify-content:flex-end}.top .btns{grid-area:btns;display:flex;gap:8px;flex-wrap:wrap}
+.top #addBtn{grid-area:add;justify-self:end}
+.rgbline{grid-area:line;display:none;height:3px;border-radius:2px;background:var(--rgb)}
+@media(max-width:700px){.top{grid-template-columns:minmax(0,1fr);grid-template-areas:"ttl" "nav" "line" "btns" "add"}
+ .top #modes{justify-content:flex-start}.rgbline{display:block}.top #addBtn{justify-self:start}}
 .chips{display:flex;flex-wrap:wrap;gap:6px}
 .tabs{display:flex;gap:4px;margin-top:20px;border-bottom:1px solid var(--line)}
 .tabs a{flex:none;display:flex;align-items:center;min-height:46px;padding:0 18px;color:var(--mute);text-decoration:none;font-weight:500;border-bottom:2px solid transparent;margin-bottom:-1px}
@@ -156,14 +161,16 @@ table{font-size:13px}.stack thead{display:none}.stack tr{display:grid;padding-bl
 <header class="band" style="padding-bottom:0">
  <div class="wrap">
   <div class="top">
-   <div><h1>Journal de trading</h1><div class="status" id="status">Chargement…</div></div>
+   <div class="ttl"><h1>Journal de trading</h1><div class="status" id="status">Chargement…</div></div>
    <nav class="chips" id="modes" aria-label="Pages du journal">
     <a class="chip" href="#challenge" data-m="Challenge">Challenge</a>
     <a class="chip" href="#reel" data-m="Réel">Réel</a>
     <a class="chip" href="#backtest" data-m="Backtest">Backtest</a>
     <a class="chip" href="#psychologie" data-m="Psychologie">Psychologie</a>
    </nav>
-   <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn ghost" id="homeBtn">← Accueil</button><button class="btn ghost" id="logoutBtn" hidden>Déconnexion</button><button class="btn" id="addBtn">+ Nouveau trade</button></div>
+   <div class="rgbline" aria-hidden="true"></div>
+   <div class="btns"><button class="btn ghost" id="homeBtn">← Accueil</button><button class="btn ghost" id="logoutBtn" hidden>Déconnexion</button></div>
+   <button class="btn" id="addBtn">+ Nouveau trade</button>
   </div>
   <section class="hero" id="heroSec">
    <div class="fig" id="fig"><svg id="chart" aria-label="Courbe des R cumulés"></svg><div class="empty" id="emptyChart">Aucun trade pour l'instant.<br>Ajoute ton premier trade pour voir ta courbe en R.</div></div>
